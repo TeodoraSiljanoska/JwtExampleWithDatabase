@@ -22,7 +22,14 @@ namespace JwtExampleWithDatabase.Data
 
         public async Task<User> GetByUsernameAsync(string username)
         {
+           
             return await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
+        }
+
+        public async Task<User> ValidateLogin(string username, string password)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == username && u.Password == password);
+            return user;
         }
 
         public async Task AddAsync(User user)

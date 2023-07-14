@@ -19,7 +19,7 @@ namespace JwtExampleWithDatabase.Controllers
     {
         private readonly IUserRepository _userRepository;
         private readonly AppSettings _appSettings;
-       private readonly DataContext _dataContext;
+       //private readonly DataContext _dataContext;
 
         public UserController(IUserRepository userRepository, IOptions<AppSettings> appSettings)
         {
@@ -53,33 +53,35 @@ namespace JwtExampleWithDatabase.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login(string username, string password)
         {
-            var user = await _userRepository.GetByUsernameAsync(username);
+            var user = await _userRepository.ValidateLogin(username,password);
             if (user == null)
                 return Unauthorized("Invalid username or password");
-
-            var tokenDescriptor = new SecurityTokenDescriptor
+            else
             {
-                Subject = new ClaimsIdentity(new[]
+                var tokenDescriptor = new SecurityTokenDescriptor
                 {
+                    Subject = new ClaimsIdentity(new[]
+                    {
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                     new Claim(ClaimTypes.Name, user.Username),
                     new Claim(ClaimTypes.Role, await _userRepository.GetUserRoleAsync(user.Username))
                 }),
-                Expires = DateTime.UtcNow.AddDays(7),
-                SigningCredentials = new SigningCredentials(
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_appSettings.Secret)),
-                    SecurityAlgorithms.HmacSha256Signature)
-            };
+                    Expires = DateTime.UtcNow.AddDays(1),
+                    SigningCredentials = new SigningCredentials(
+                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_appSettings.Secret)),
+                        SecurityAlgorithms.HmacSha256Signature)
+                };
 
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            var tokenString = tokenHandler.WriteToken(token);
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var token = tokenHandler.CreateToken(tokenDescriptor);
+                var tokenString = tokenHandler.WriteToken(token);
 
-            return Ok(new { Token = tokenString });
+                return Ok(new { Token = tokenString });
+            }
         }
 
         [HttpGet("test")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "User")]
         public IActionResult TestAdminOnly()
         {
             return Ok("This endpoint is accessible only by users with the 'Admin' role.");
