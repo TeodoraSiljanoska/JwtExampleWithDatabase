@@ -27,6 +27,7 @@ namespace JwtExampleWithDatabase.Controllers
             _appSettings = appSettings.Value;
         }
 
+        [AllowAnonymous]
         [HttpPost("register")]
         public async Task<IActionResult> Register(string username, string password)
         {
@@ -81,7 +82,7 @@ namespace JwtExampleWithDatabase.Controllers
         }
 
         [HttpGet("test")]
-        [Authorize(Roles = "User")]
+        [Authorize(Roles = "Admin")]
         public IActionResult TestAdminOnly()
         {
             return Ok("This endpoint is accessible only by users with the 'Admin' role.");
