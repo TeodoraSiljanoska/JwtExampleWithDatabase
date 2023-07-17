@@ -18,13 +18,14 @@ namespace JwtExampleWithDatabase.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserRepository _userRepository;
-        private readonly AppSettings _appSettings;
-       //private readonly DataContext _dataContext;
+        private readonly IConfiguration _config;
+       
 
-        public UserController(IUserRepository userRepository, IOptions<AppSettings> appSettings)
+
+        public UserController(IUserRepository userRepository, IConfiguration config)
         {
             _userRepository = userRepository;
-            _appSettings = appSettings.Value;
+            _config = config;
         }
 
         [AllowAnonymous]
@@ -34,11 +35,9 @@ namespace JwtExampleWithDatabase.Controllers
             var existingUser = await _userRepository.GetByUsernameAsync(username);
             if (existingUser != null)
                 return BadRequest("Username already exists");
-            //var lastUser =  _dataContext.Users.OrderByDescending(a => a.Id).First();
+            
             var user = new User
             {
-                
-               // Id = lastUser.Id+1,
                 Username = username,
                 Password = password,
                 Role = "User"
@@ -59,25 +58,8 @@ namespace JwtExampleWithDatabase.Controllers
                 return Unauthorized("Invalid username or password");
             else
             {
-                var tokenDescriptor = new SecurityTokenDescriptor
-                {
-                    Subject = new ClaimsIdentity(new[]
-                    {
-                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new Claim(ClaimTypes.Name, user.Username),
-                    new Claim(ClaimTypes.Role, await _userRepository.GetUserRoleAsync(user.Username))
-                }),
-                    Expires = DateTime.UtcNow.AddDays(1),
-                    SigningCredentials = new SigningCredentials(
-                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_appSettings.Secret)),
-                        SecurityAlgorithms.HmacSha256Signature)
-                };
-
-                var tokenHandler = new JwtSecurityTokenHandler();
-                var token = tokenHandler.CreateToken(tokenDescriptor);
-                var tokenString = tokenHandler.WriteToken(token);
-
-                return Ok(new { Token = tokenString });
+                var token = GenerateToken(user);
+                return Ok(token);
             }
         }
 
@@ -87,5 +69,26 @@ namespace JwtExampleWithDatabase.Controllers
         {
             return Ok("This endpoint is accessible only by users with the 'Admin' role.");
         }
+
+        private string GenerateToken(User user)
+        {
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Username),
+                new Claim(ClaimTypes.Role, user.Role)
+            };
+
+            var token = new JwtSecurityToken(_config["Jwt:Issuer"],
+                _config["Jwt:Audience"],
+                claims,
+                expires: DateTime.Now.AddMinutes(15),
+                signingCredentials: credentials);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+
+        }
+
     }
 }

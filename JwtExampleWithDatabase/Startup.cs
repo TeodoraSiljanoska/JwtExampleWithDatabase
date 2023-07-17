@@ -19,17 +19,10 @@ namespace JwtExampleWithDatabase
         {
             Configuration = configuration;
         }
-
-        //private readonly AppSettings _appSettings;
         public IConfiguration Configuration { get; }
 
         public void ConfigureServices(IServiceCollection services)
         {
-            // Configure AppSettings
-            services.Configure<AppSettings>(Configuration.GetSection("AppSettings"));
-
-            var appSettings = Configuration.GetSection("AppSettings").Get<AppSettings>();
-            var key = Encoding.ASCII.GetBytes(appSettings.Secret);
 
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddControllers();
@@ -48,24 +41,19 @@ namespace JwtExampleWithDatabase
                 options.OperationFilter<SecurityRequirementsOperationFilter>();
             });
 
-            services.AddAuthentication(options =>
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
             {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-    .AddJwtBearer(options =>
-    {
-        options.RequireHttpsMetadata = false;
-        options.SaveToken = true;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
-            ValidateIssuer = false,
-            ValidateAudience = false,
-
-        };
-    });
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = Configuration["Jwt:Issuer"],
+                    ValidAudience = Configuration["Jwt:Audience"],
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["Jwt:Key"]))
+                };
+            });
 
 
             var connectionString = Configuration.GetConnectionString("DefaultConnection");
